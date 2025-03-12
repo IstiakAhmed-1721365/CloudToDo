@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My To-Do List</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-firestore-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f7;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+        h1 {
+            color: #007aff;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        #todo-input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px 0 0 8px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #007aff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 0 8px 8px 0;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background-color: #f9f9f9;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            transition: background-color 0.2s;
+        }
+        li:hover {
+            background-color: #f0f0f0;
+        }
+        li.completed {
+            text-decoration: line-through;
+            opacity: 0.7;
+        }
+        .delete-btn {
+            margin-left: auto;
+            background-color: #ff3b30;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 12px;
+            cursor: pointer;
+        }
+        .delete-btn:hover {
+            background-color: #d63030;
+        }
+        .checkbox {
+            margin-right: 10px;
+            width: 20px;
+            height: 20px;
+        }
+        .priority-high {
+            border-left: 4px solid #ff3b30;
+        }
+        .priority-medium {
+            border-left: 4px solid #ff9500;
+        }
+        .priority-low {
+            border-left: 4px solid #34c759;
+        }
+        .filters {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .filter-btn {
+            background-color: #e0e0e0;
+            color: #333;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        .filter-btn.active {
+            background-color: #007aff;
+            color: white;
+        }
+        .due-date {
+            margin-left: 10px;
+            font-size: 12px;
+            color: #888;
+        }
+        #date-input {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 0;
+            font-size: 16px;
+        }
+        #priority-select {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 0;
+            font-size: 16px;
+        }
+        .auth-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .auth-form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+        .auth-form input {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        .auth-form button {
+            border-radius: 8px;
+        }
+        .auth-toggle {
+            margin-top: 10px;
+            color: #007aff;
+            cursor: pointer;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #007aff;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .user-info {
+            text-align: right;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .sync-status {
+            text-align: center;
+            font-size: 12px;
+            color: #888;
+            margin-top: 10px;
+        }
+        @media (max-width: 600px) {
+            .input-group {
+                flex-direction: column;
+            }
+            #todo-input, button, #date-input, #priority-select {
+                border-radius: 8px;
+                margin-bottom: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="auth-section" class="auth-container">
+            <h1>My To-Do List</h1>
+            <div id="login-form" class="auth-form">
+                <input type="email" id="email-input" placeholder="Email">
+                <input type="password" id="password-input" placeholder="Password">
+                <button id="login-btn">Sign In</button>
+                <p class="auth-toggle" id="register-toggle">Don't have an account? Sign Up</p>
+            </div>
+            <div id="register-form" class="auth-form" style="display: none;">
+                <input type="email" id="reg-email-input" placeholder="Email">
+                <input type="password" id="reg-password-input" placeholder="Password">
+                <button id="register-btn">Sign Up</button>
+                <p class="auth-toggle" id="login-toggle">Already have an account? Sign In</p>
+            </div>
+            <div id="spinner" class="spinner"></div>
+        </div>
+        
+        <div id="app-section" style="display: none;">
+            <div class="user-info">
+                <span id="user-email"></span> | 
+                <a href="#" id="logout-btn">Logout</a>
+            </div>
+            
+            <h1>My To-Do List</h1>
+            
+            <div class="input-group">
+                <input type="text" id="todo-input" placeholder="Add a new task...">
+                <input type="date" id="date-input">
+                <select id="priority-select">
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                </select>
+                <button id="add-btn">Add</button>
+            </div>
+            
+            <div class="filters">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="active">Active</button>
+                <button class="filter-btn" data-filter="completed">Completed</button>
+            </div>
+            
+            <ul id="todo-list"></ul>
+            
+            <div class="sync-status" id="sync-status">All changes saved</div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize Firebase with your config
+            const firebaseConfig = {
+                apiKey: "AIzaSyCTe2y1gsk6-RA5DceNIb-W5OC70vl4okc",
+                authDomain: "cloudtodo-db822.firebaseapp.com",
+                projectId: "cloudtodo-db822",
+                storageBucket: "cloudtodo-db822.firebasestorage.app",
+                messagingSenderId: "995671449465",
+                appId: "1:995671449465:web:2ce755d8bb89b8d60419a8",
+                measurementId: "G-HL9WVQFC52"
+            };
+            
+            // Initialize Firebase
+            firebase.initializeApp(firebaseConfig);
+            
+            // Initialize Firestore
+            const db = firebase.firestore();
+            
+            // References to DOM elements
+            const todoInput = document.getElementById('todo-input');
+            const dateInput = document.getElementById('date-input');
+            const prioritySelect = document.getElementById('priority-select');
+            const addBtn = document.getElementById('add-btn');
+            const todoList = document.getElementById('todo-list');
+            const filterBtns = document.querySelectorAll('.filter-btn');
+            const authSection = document.getElementById('auth-section');
+            const appSection = document.getElementById('app-section');
+            const loginForm = document.getElementById('login-form');
+            const registerForm = document.getElementById('register-form');
+            const loginBtn = document.getElementById('login-btn');
+            const registerBtn = document.getElementById('register-btn');
+            const registerToggle = document.getElementById('register-toggle');
+            const loginToggle = document.getElementById('login-toggle');
+            const userEmail = document.getElementById('user-email');
+            const logoutBtn = document.getElementById('logout-btn');
+            const spinner = document.getElementById('spinner');
+            const syncStatus = document.getElementById('sync-status');
+            
+            // Set today as default date
+            const today = new Date();
+            const formattedDate = today.toISOString().substr(0, 10);
+            dateInput.value = formattedDate;
+            
+            // Store todos and current filter
+            let todos = [];
+            let currentFilter = 'all';
+            let unsubscribe = null;
+            
+            // Authentication form toggle
+            registerToggle.addEventListener('click', function() {
+                loginForm.style.display = 'none';
+                registerForm.style.display = 'flex';
+            });
+            
+            loginToggle.addEventListener('click', function() {
+                registerForm.style.display = 'none';
+                loginForm.style.display = 'flex';
+            });
+            
+            // Register user
+            registerBtn.addEventListener('click', function() {
+                const email = document.getElementById('reg-email-input').value;
+                const password = document.getElementById('reg-password-input').value;
+                
+                if (email && password) {
+                    spinner.style.display = 'block';
+                    
+                    firebase.auth().createUserWithEmailAndPassword(email, password)
+                        .then((userCredential) => {
+                            // Registration successful, user is signed in
+                            spinner.style.display = 'none';
+                        })
+                        .catch((error) => {
+                            // Handle registration errors
+                            alert('Registration error: ' + error.message);
+                            spinner.style.display = 'none';
+                        });
+                } else {
+                    alert('Please enter both email and password');
+                }
+            });
+            
+            // Login user
+            loginBtn.addEventListener('click', function() {
+                const email = document.getElementById('email-input').value;
+                const password = document.getElementById('password-input').value;
+                
+                if (email && password) {
+                    spinner.style.display = 'block';
+                    
+                    firebase.auth().signInWithEmailAndPassword(email, password)
+                        .then((userCredential) => {
+                            // Login successful
+                            spinner.style.display = 'none';
+                        })
+                        .catch((error) => {
+                            // Handle login errors
+                            alert('Login error: ' + error.message);
+                            spinner.style.display = 'none';
+                        });
+                } else {
+                    alert('Please enter both email and password');
+                }
+            });
+            
+            // Logout user
+            logoutBtn.addEventListener('click', function() {
+                firebase.auth().signOut()
+                    .then(() => {
+                        // Logout successful
+                    })
+                    .catch((error) => {
+                        alert('Logout error: ' + error.message);
+                    });
+            });
+            
+            // Auth state changes
+            firebase.auth().onAuthStateChanged((user) => {
+                if (user) {
+                    // User is signed in
+                    authSection.style.display = 'none';
+                    appSection.style.display = 'block';
+                    userEmail.textContent = user.email;
+                    
+                    // Subscribe to user's todos
+                    subscribeTodos(user.uid);
+                } else {
+                    // User is signed out
+                    authSection.style.display = 'block';
+                    appSection.style.display = 'none';
+                    
+                    // Unsubscribe from todos
+                    if (unsubscribe) {
+                        unsubscribe();
+                        unsubscribe = null;
+                    }
+                    
+                    // Clear forms
+                    document.getElementById('email-input').value = '';
+                    document.getElementById('password-input').value = '';
+                    document.getElementById('reg-email-input').value = '';
+                    document.getElementById('reg-password-input').value = '';
+                    loginForm.style.display = 'flex';
+                    registerForm.style.display = 'none';
+                }
+            });
+            
+            // Subscribe to todos collection for current user
+            function subscribeTodos(userId) {
+                unsubscribe = db.collection('users').doc(userId).collection('todos')
+                    .orderBy('createdAt', 'desc')
+                    .onSnapshot((snapshot) => {
+                        syncStatus.textContent = 'All changes saved';
+                        todos = [];
+                        snapshot.forEach((doc) => {
+                            todos.push({
+                                id: doc.id,
+                                ...doc.data()
+                            });
+                        });
+                        renderTodos(currentFilter);
+                    }, (error) => {
+                        console.error("Error getting todos:", error);
+                        syncStatus.textContent = 'Error syncing: ' + error.message;
+                    });
+            }
+            
+            // Function to render todos
+            function renderTodos(filter = 'all') {
+                currentFilter = filter;
+                todoList.innerHTML = '';
+                
+                todos.forEach((todo) => {
+                    // Apply filter
+                    if (filter === 'active' && todo.completed) return;
+                    if (filter === 'completed' && !todo.completed) return;
+                    
+                    const li = document.createElement('li');
+                    li.classList.add(`priority-${todo.priority}`);
+                    if (todo.completed) {
+                        li.classList.add('completed');
+                    }
+                    
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.classList.add('checkbox');
+                    checkbox.checked = todo.completed;
+                    checkbox.addEventListener('change', function() {
+                        toggleComplete(todo.id, !todo.completed);
+                    });
+                    
+                    const todoText = document.createElement('span');
+                    todoText.textContent = todo.text;
+                    
+                    const dueDate = document.createElement('span');
+                    dueDate.classList.add('due-date');
+                    dueDate.textContent = todo.date;
+                    
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.classList.add('delete-btn');
+                    deleteBtn.textContent = 'Delete';
+                    deleteBtn.addEventListener('click', function() {
+                        deleteTodo(todo.id);
+                    });
+                    
+                    li.appendChild(checkbox);
+                    li.appendChild(todoText);
+                    li.appendChild(dueDate);
+                    li.appendChild(deleteBtn);
+                    todoList.appendChild(li);
+                });
+            }
+            
+            // Function to add a new todo
+            function addTodo() {
+                const text = todoInput.value.trim();
+                const date = dateInput.value;
+                const priority = prioritySelect.value;
+                
+                if (text !== '') {
+                    const user = firebase.auth().currentUser;
+                    if (!user) return;
+                    
+                    syncStatus.textContent = 'Saving...';
+                    
+                    const newTodo = {
+                        text,
+                        date,
+                        priority,
+                        completed: false,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+                    
+                    db.collection('users').doc(user.uid).collection('todos').add(newTodo)
+                        .then(() => {
+                            todoInput.value = '';
+                            const today = new Date();
+                            const formattedDate = today.toISOString().substr(0, 10);
+                            dateInput.value = formattedDate;
+                            prioritySelect.value = 'low';
+                        })
+                        .catch((error) => {
+                            console.error("Error adding todo:", error);
+                            syncStatus.textContent = 'Error saving: ' + error.message;
+                        });
+                }
+            }
+            
+            // Function to toggle todo completion
+            function toggleComplete(todoId, completed) {
+                const user = firebase.auth().currentUser;
+                if (!user) return;
+                
+                syncStatus.textContent = 'Saving...';
+                
+                db.collection('users').doc(user.uid).collection('todos').doc(todoId).update({
+                    completed: completed
+                }).catch((error) => {
+                    console.error("Error updating todo:", error);
+                    syncStatus.textContent = 'Error saving: ' + error.message;
+                });
+            }
+            
+            // Function to delete a todo
+            function deleteTodo(todoId) {
+                const user = firebase.auth().currentUser;
+                if (!user) return;
+                
+                syncStatus.textContent = 'Deleting...';
+                
+                db.collection('users').doc(user.uid).collection('todos').doc(todoId).delete()
+                    .catch((error) => {
+                        console.error("Error deleting todo:", error);
+                        syncStatus.textContent = 'Error deleting: ' + error.message;
+                    });
+            }
+            
+            // Event listener for add button
+            addBtn.addEventListener('click', addTodo);
+            
+            // Event listener for enter key
+            todoInput.addEventListener('keyup', function(event) {
+                if (event.key === 'Enter') {
+                    addTodo();
+                }
+            });
+            
+            // Event listeners for filter buttons
+            filterBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    filterBtns.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    renderTodos(this.dataset.filter);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
